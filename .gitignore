@@ -1,19 +1,77 @@
-.DS_Store
-Thumbs.db
-
-db.sqlite3
-
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-*.log
+# C extensions
+*.so
 
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environments
+.env
+.venv
 env/
 venv/
-.diploma_env/
+ENV/
+env.bak/
+venv.bak/
 
+# PyCharm/VS Code settings
 .idea/
 .vscode/
 
-.env
+# SQLite database (Локальная БД - НЕ КОММИТИТЬ!)
+db.sqlite3
+db.sqlite3-journal
+
+# Logs
+*.log
+
+# Local test server data
+local_settings.py
+
+# Sphinx documentation
+docs/_build/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Database backup files (если будешь использовать pg_dump или аналоги)
+*.sql
+*.dump
