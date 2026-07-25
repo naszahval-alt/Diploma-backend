@@ -1,5 +1,17 @@
-from rest_framework import viewsets
+"""
+views.py — представления (views) для API системы автоматизации закупок.
+
+Реализует:
+- регистрацию пользователя (отдельный APIView);
+- CRUD по сущностям через ViewSet (магазины, товары, заказы и т.д.);
+- разграничение прав: часть данных видна всем, часть — только авторизованным;
+- фильтрацию: пользователи видят только свои контакты и заказы.
+"""
+
+from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from django.db.models import Sum, F
 from .models import (
     User, Shop, Category, Product,
@@ -7,11 +19,23 @@ from .models import (
     Contact, Order, OrderItem
 )
 from .serializers import (
-    UserSerializer, ShopSerializer, CategorySerializer,
+    UserSerializer, UserRegistrationSerializer, ShopSerializer, CategorySerializer,
     ProductSerializer, ProductInfoSerializer, ParameterSerializer,
     ProductParameterSerializer, ContactSerializer,
     OrderSerializer, OrderItemSerializer
 )
+
+
+class RegisterUserView(APIView):
+    """Регистрация пользователя: принимает данные, валидирует, создаёт и возвращает профиль."""
+    permission_classes = []
+
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):

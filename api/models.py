@@ -1,3 +1,11 @@
+"""
+Модели для сервиса закупок.
+Тут описаны все таблицы нашей базы:
+- Пользователи (покупатели и магазины)
+- Каталог товаров
+- Заказы покупателей
+"""
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
@@ -48,6 +56,10 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
+    """
+    Кастомная модель пользователя. Авторизация идет по Email вместо username.
+    Разделение ролей: Покупатель или Магазин.
+    """
     username_validator = None
 
     # Делаю обычное имя НЕ обязательным
@@ -83,6 +95,7 @@ class User(AbstractUser):
 
 # МОДЕЛИ КАТАЛОГА
 class Shop(models.Model):
+    """Магазин-поставщик"""
     title = models.CharField(max_length=100, verbose_name='Название магазина')
     url = models.URLField(verbose_name='Ссылка на API поставщика', null=True, blank=True)
     owner = models.OneToOneField(User, verbose_name='Ответственный менеджер',
@@ -100,6 +113,7 @@ class Shop(models.Model):
 
 
 class Category(models.Model):
+    """Категория товаров"""
     title = models.CharField(max_length=40, verbose_name='Название категории')
     stores = models.ManyToManyField(Shop, 
                                     verbose_name='Магазины', 
@@ -116,6 +130,7 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    """Базовая карточка товара (без цен)"""
     name = models.CharField(max_length=200, verbose_name='Наименование')
     category = models.ForeignKey(Category, 
                                  verbose_name='Категория',
@@ -134,6 +149,11 @@ class Product(models.Model):
 
 
 class ProductInfo(models.Model):
+    """
+    Конкретное предложение товара от конкретного магазина.
+    Здесь хранится цена закупки, розница и сколько штук осталось.
+    Характеристики хранятся в JSON для гибкости.
+    """
     product = models.ForeignKey(Product,
                                 verbose_name='Базовый товар',
                                 related_name='offers',
@@ -166,7 +186,7 @@ class ProductInfo(models.Model):
 
 
 class Parameter(models.Model):
-    """Характеристика товара"""
+    """Характеристика товара (например: Цвет, Размер)"""
     name = models.CharField(max_length=40, verbose_name='Название параметра', unique=True)
 
     class Meta:
@@ -197,6 +217,10 @@ class ProductParameter(models.Model):
 
 
 class Contact(models.Model):
+    """
+    Контактные данные пользователя (адреса доставки или телефоны).
+    Один пользователь может иметь несколько контактов.
+    """
     CONTACT_TYPES = (
         ('phone', 'Телефон'),
         ('address', 'Адрес доставки'),
@@ -224,6 +248,11 @@ class Contact(models.Model):
 
 
 class Order(models.Model):
+    """
+    Заказ покупателя.
+    Содержит список товаров (items) и общую сумму заказа.
+    Статус меняется по мере сборки и отправки.
+    """
     buyer = models.ForeignKey(User, verbose_name='Покупатель', related_name='orders', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     status = models.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15, default='new')
@@ -240,6 +269,7 @@ class Order(models.Model):
 
     @property
     def total_amount(self):
+        """Считаем общую сумму заказа по его позициям"""
         items_sum = sum(item.line_total for item in self.items.all())
         return items_sum
 
@@ -248,6 +278,9 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
+    """
+    Конкретная позиция внутри заказа (какая товарная позиция и сколько штук).
+    """
     order = models.ForeignKey(Order, verbose_name='Заказ', related_name='items', on_delete=models.CASCADE)
     offer = models.ForeignKey(ProductInfo, 
                               verbose_name='Позиция из прайса', 
@@ -257,6 +290,9 @@ class OrderItem(models.Model):
 
     @property
     def line_total(self):
+        """
+        Стоимость этой конкретной строки в чеке
+        """
         return self.amount * float(self.offer.retail_price)
 
     class Meta:

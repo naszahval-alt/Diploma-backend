@@ -1,3 +1,8 @@
+"""
+Административная панель Django Admin.
+Настройка отображения моделей проекта в интерфейсе администратора.
+"""
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
@@ -9,11 +14,13 @@ from .models import (
 
 # --- ИНЛАЙНЫ (ВЛОЖЕННЫЕ ТАБЛИЦЫ) ---
 class ProductParameterInline(admin.TabularInline):
+    """Редактирование характеристик товара прямо внутри карточки предложения"""
     model = ProductParameter
     extra = 1
 
 
 class OrderItemInline(admin.TabularInline):
+    """Состав заказа: товары и их количество"""
     model = OrderItem
     extra = 0
     readonly_fields = ('line_total',)
@@ -21,6 +28,7 @@ class OrderItemInline(admin.TabularInline):
 
 
 class ContactInline(admin.TabularInline):
+    """Адреса доставки и телефоны покупателя"""
     model = Contact
     extra = 1
     verbose_name = "Контакт"
@@ -28,6 +36,7 @@ class ContactInline(admin.TabularInline):
 
 
 class OrderInline(admin.TabularInline):
+    """Список товаров внутри конкретного заказа"""
     model = Order
     extra = 0
 
@@ -78,6 +87,10 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(ProductInfo)
 class ProductInfoAdmin(admin.ModelAdmin):
+    """
+    Предложение товара от конкретного магазина.
+    Здесь хранятся цена закупки/продажи и остатки.
+    """
     list_display = ('product_title', 'shop_title', 'retail_price', 'available_count')
     list_filter = ('shop',)
     search_fields = ('product__name', 'shop__title', 'article')
@@ -116,6 +129,10 @@ class ContactAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
+    """
+    Управление заказами покупателей.
+    Сумма считается динамически, редактировать её нельзя.
+    """
     list_display = ('id', 'buyer_email', 'status', 'created_at', 'total_amount')
     list_filter = ('status', 'created_at')
     search_fields = ('buyer__email', 'id')
@@ -141,7 +158,7 @@ class UserAdmin(BaseUserAdmin):
 
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'company', 'position', 'type')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'type')}),
         ('Permissions', {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
