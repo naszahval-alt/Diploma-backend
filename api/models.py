@@ -255,12 +255,13 @@ class Order(models.Model):
     """
     buyer = models.ForeignKey(User, verbose_name='Покупатель', related_name='orders', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    status = models.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15, default='new')
+    status = models.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15, default='basket')
     delivery_contact = models.ForeignKey(Contact, 
                                          verbose_name='Доставка',
                                          null=True, 
                                          blank=True, 
                                          on_delete=models.SET_NULL)
+    
 
     class Meta:
         verbose_name = 'Заказ'
@@ -281,7 +282,7 @@ class OrderItem(models.Model):
     """
     Конкретная позиция внутри заказа (какая товарная позиция и сколько штук).
     """
-    order = models.ForeignKey(Order, verbose_name='Заказ', related_name='items', on_delete=models.CASCADE)
+    order = models.ForeignKey('api.Order', verbose_name='Заказ', related_name='items', on_delete=models.CASCADE)
     offer = models.ForeignKey(ProductInfo, 
                               verbose_name='Позиция из прайса', 
                               related_name='order_lines', 
@@ -293,7 +294,7 @@ class OrderItem(models.Model):
         """
         Стоимость этой конкретной строки в чеке
         """
-        return self.amount * float(self.offer.retail_price)
+        return self.amount * self.offer.retail_price
 
     class Meta:
         verbose_name = 'Строка заказа'

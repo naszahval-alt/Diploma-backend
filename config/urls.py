@@ -1,32 +1,54 @@
 """
-config/urls.py — маршрутизация (URL-конфигурация) для API системы автоматизации закупок.
+Конфигурация URL-маршрутизации проекта DiplomaProject.
 
-Реализует:
-- подключение админки Django;
-- регистрацию всех ViewSet через роутер (API v1);
-- Swagger-документацию по адресу /docs/.
+Настраивает:
+- Доступ к админ-панели Django.
+- Маршруты API v1 через DefaultRouter.
+- Интерактивную документацию Swagger/ReDoc.
+- Эндпоинты авторизации SimpleJWT.
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+from api.views import RegisterUserView 
 
+
+# Вьюсеты нашего приложения 'api'
 from api.views import (
+    UserViewSet,
     ShopViewSet,
     CategoryViewSet,
     ProductViewSet,
     ProductInfoViewSet,
     ContactViewSet,
     OrderViewSet,
-    UserViewSet,
 )
 
-from rest_framework import permissions
+# Документация (Swagger / ReDoc)
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from rest_framework import permissions
 
-# Создаём роутер и регистрируем все ViewSet
+# Настраиваем Swagger-документацию
+schema_view = get_schema_view(
+   openapi.Info(
+      title="Diploma Project API",
+      default_version='v1',
+      description="Backend сервиса автоматизации закупок.",
+   ),
+   public=True,
+   permission_classes=(permissions.AllowAny,),
+)
+
+# РЕГИСТРАЦИЯ МАРШРУТОВ
 router = DefaultRouter()
+
+# Регистрация ресурсов каталога и пользователей
 router.register(r'shops', ShopViewSet)
 router.register(r'categories', CategoryViewSet)
 router.register(r'products', ProductViewSet)
@@ -35,24 +57,21 @@ router.register(r'contacts', ContactViewSet)
 router.register(r'orders', OrderViewSet)
 router.register(r'users', UserViewSet)
 
-# Настраиваем Swagger-документацию
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Diploma Project API",
-        default_version='v1',
-        description="Backend для автоматизации закупок",
-    ),
-    public=True,
-    permission_classes=(permissions.AllowAny,),
-)
-
 urlpatterns = [
     # Админка Django
     path('admin/', admin.site.urls),
 
-    # Все API-маршруты по префиксу /api/v1/
+    # Основной префикс API версии 1
     path('api/v1/', include(router.urls)),
 
-    # Swagger UI для документации API
+    # Аутентификация (SimpleJWT)
+    path('api/v1/token/', TokenObtainPairView.as_view()),
+    path('api/v1/token/refresh/', TokenRefreshView.as_view()),
+    
+    # Регистрация
+    path('api/v1/register/', RegisterUserView.as_view(), name='register-user'),
+
+    # Документация
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0)),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0)),
 ]

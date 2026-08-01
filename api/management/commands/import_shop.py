@@ -1,15 +1,20 @@
 """
-Команда для загрузки товаров из файла shop1.yaml в базу данных.
-Позволяет быстро заполнить каталог данными от поставщика перед тестированием API.
+Команда для загрузки товаров из YAML-файла shop1.yaml.
 """
 
 import os
+from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from yaml import load as load_yaml, Loader
+
 from api.models import (
-    Shop, Category, Product,
-    ProductInfo, Parameter, ProductParameter
+    Shop,
+    Category,
+    Product,
+    ProductInfo,
+    Parameter,
+    ProductParameter
 )
 
 
@@ -17,17 +22,15 @@ class Command(BaseCommand):
     help = 'Импорт каталога товаров из YAML-файла'
 
     def add_arguments(self, parser):
-        pass
+        parser.add_argument(
+            '--file',
+            type=str,
+            default='shop1.yaml',
+            help='Путь к YAML-файлу (относительно BASE_DIR)'
+        )
 
     def handle(self, *args, **options):
-        """
-        Основная логика команды:
-        1. Читает файл shop1.yaml.
-        2. Находит магазин "Связной" (или создает его).
-        3. Удаляет старые товары этого магазина.
-        4. Создает новые товары и предложения с ценами.
-        """
-        file_path = os.path.join(settings.BASE_DIR, 'shop1.yaml')
+        file_path = os.path.join(settings.BASE_DIR, options['file'])
 
         if not os.path.exists(file_path):
             self.stdout.write(self.style.ERROR(f'Файл {file_path} не найден'))
@@ -40,54 +43,49 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'Ошибка чтения файла: {e}'))
             return
 
-        # --- 1. Получаем или создаем магазин ---
-        # Название берем прямо из поля "shop:" внутри самого YAML-файла
-        shop_data = data.get('shop', {})
-        shop_title = shop_data if isinstance(shop_data, str) else shop_data.get('name', '')
-
+        # 1/ Получаем или создаем магазин
+        # Берем значение напрямую из ключа "shop"
+        shop_title = data.get('shop')
         if not shop_title:
-            self.stdout.write(self.style.ERROR(
-                f'В файле {file_path} не указано имя магазина (ключ "shop")'
-            ))
+            self.stdout.write(self.style.ERROR('В файле не указано имя магазина (ключ "shop")'))
             return
 
-        # Ищем магазин по названию. Если его нет — создаем новый.
+        # Ищем по полю title
         shop, created = Shop.objects.get_or_create(
             title=shop_title,
             defaults={'accepts_orders': True}
         )
+
         action_word = 'создан' if created else 'найден/обновлен'
         self.stdout.write(self.style.SUCCESS(f'Магазин "{shop.title}" {action_word}. ID: {shop.id}'))
 
-        # --- 2. Очистка старых предложений этого магазина ---
-        # Перед новой заливкой удаляем старые цены этого же магазина, чтобы не было дублей цен.
+        # 2. Очистка старых предложений этого магазина
         deleted_count, _ = ProductInfo.objects.filter(shop=shop).delete()
         self.stdout.write(self.style.SUCCESS(f'Удалено старых предложений: {deleted_count}'))
 
         created_offers = 0
 
-        # --- 3. Основной цикл обработки товаров ---
+        # 3. Основной цикл обработки товаров
         for item in data.get('goods', []):
-
             cat_id = item.get('category')
-            # Ищем описание категории внутри самого файла по ID
-            cat_data = next(
-                (c for c in data.get('categories', []) if c['id'] == cat_id),
-                None
-            )
+
+            # Ищем описание категории внутри файла по ID
+            cat_data = next((c for c in data.get('categories', []) if c['id'] == cat_id), None)
 
             if not cat_data:
                 self.stdout.write(
                     self.style.WARNING(
-                        f'Пропуск товара {item.get("name")}: категория {cat_id} не описана в разделе categories.')
+                        f'Пропуск товара {item.get("name")}: категория {cat_id} не описана в разделе categories.'
+                    )
                 )
                 continue
 
-            # Создаем категорию (если её еще нет в базе)
+            # Создаем категорию, используя поле title
             category, _ = Category.objects.get_or_create(
                 id=cat_data['id'],
-                defaults={'title': cat_data['name']}
+                defaults={'title': cat_data['name']} 
             )
+
             # Привязываем магазин к категории (связь Many-to-Many)
             category.stores.add(shop)
 
@@ -100,18 +98,36 @@ class Command(BaseCommand):
             # Конкретное предложение от магазина (цена + наличие)
             offer_defaults = {
                 'available_count': item['quantity'],
-                'cost_price': item['price'],
-                'retail_price': item['price_rrc'],
-                'parameters': item.get('parameters', {}),  # JSON-поле с характеристиками
+                'cost_price': Decimal(str(item['price'])),
+                'retail_price': Decimal(str(item['price_rrc'])),
+                'parameters': item.get('parameters', {}),
             }
 
-            # Обновляем цену если она изменилась, или создаем новую запись
+            # Используем update_or_create, чтобы избежать дублей при повторном запуске импорта
             offer, is_created = ProductInfo.objects.update_or_create(
                 product=product,
                 shop=shop,
-                article=str(item.get('id', '')),
+                article=str(item.get('id')),
                 defaults=offer_defaults
             )
+
+            # Обработка параметров (EAV-модель)
+            existing_params = {pp.parameter.name: pp for pp in offer.parameter_links.select_related('parameter').all()}
+
+            for param_name, value in item.get('parameters', {}).items():
+                parameter_obj, _ = Parameter.objects.get_or_create(name=param_name)
+
+                if param_name in existing_params:
+                    # Если параметр уже есть у этого предложения — обновляем значение
+                    existing_params[param_name].value = str(value)
+                    existing_params[param_name].save()
+                else:
+                    # Если параметра нет — создаем новую связь
+                    ProductParameter.objects.create(
+                        product_info=offer,
+                        parameter=parameter_obj,
+                        value=str(value)
+                    )
 
             if is_created:
                 created_offers += 1

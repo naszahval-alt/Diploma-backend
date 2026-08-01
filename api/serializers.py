@@ -4,6 +4,7 @@ Cериализаторы для API автоматизации закупок.
 Пароль и себестоимость не отдаём в API.
 """
 
+# serializers.py
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from .models import (
@@ -12,9 +13,7 @@ from .models import (
     Contact, Order, OrderItem
 )
 
-
 class UserSerializer(serializers.ModelSerializer):
-    """Пользователь: показываем контакты, пароль не возвращаем."""
     contacts = serializers.StringRelatedField(many=True, read_only=True)
 
     class Meta:
@@ -24,7 +23,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """Регистрация: проверяем, что пароли совпадают, и ставим пароль"""
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True)
 
@@ -33,13 +31,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ('email', 'first_name', 'last_name', 'type', 'password', 'password2')
 
     def validate(self, data):
-        """Проверяем, что password и password2 одинаковые."""
         if data['password'] != data['password2']:
             raise serializers.ValidationError({"password": "Пароли не совпадают."})
         return data
 
     def create(self, validated_data):
-        """Создаём пользователя и ставим пароль."""
         validated_data.pop('password2')
         password = validated_data.pop('password')
         user = self.Meta.model(**validated_data)
@@ -49,7 +45,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class ShopSerializer(serializers.ModelSerializer):
-    """Магазин: показываем email владельца."""
     owner_email = serializers.ReadOnlyField(source='owner.email')
 
     class Meta:
@@ -58,7 +53,6 @@ class ShopSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    """Категория: список магазинов и их количество."""
     shops = serializers.StringRelatedField(many=True, source='category_list', read_only=True)
     stores_count = serializers.SerializerMethodField()
 
@@ -71,7 +65,6 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """Товар: показываем название категории вместо ID."""
     category_name = serializers.CharField(source='category.title', read_only=True)
 
     class Meta:
@@ -80,14 +73,12 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ParameterSerializer(serializers.ModelSerializer):
-    """Параметры (цвет, размер и т.п.) — справочник."""
     class Meta:
         model = Parameter
         fields = '__all__'
 
 
 class ProductParameterSerializer(serializers.ModelSerializer):
-    """Значение параметра у товара: имя параметра и его значение."""
     parameter_name = serializers.CharField(source='parameter.name', read_only=True)
 
     class Meta:
@@ -97,16 +88,13 @@ class ProductParameterSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoSerializer(serializers.ModelSerializer):
-    """Предложение товара (прайс): данные товара, магазина и параметры."""
     product = ProductSerializer(read_only=True)
     shop_title = serializers.CharField(source='shop.title', read_only=True)
-
     parameters = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductInfo
-        # Исключаю себестоимость из публичного API
-        exclude = ('cost_price',)
+        exclude = ('cost_price',)  # себестоимость не отдаём в API
 
     def get_parameters(self, obj):
         result = []
@@ -119,7 +107,6 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
 
 class ContactSerializer(serializers.ModelSerializer):
-    """Контакт: показываем email пользователя"""
     user_email = serializers.ReadOnlyField(source='user.email')
 
     class Meta:
@@ -129,23 +116,23 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    """Позиция заказа: количество и данные предложения"""
     offer_data = ProductInfoSerializer(source='offer', read_only=True)
+    line_total = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ('id', 'amount', 'offer', 'offer_data')
-        extra_kwargs = {
-            'offer': {'write_only': True}
-        }
+        fields = ('id', 'amount', 'offer', 'offer_data', 'line_total')
+        extra_kwargs = {'offer': {'write_only': True}}
+
+    def get_line_total(self, obj):
+        return obj.line_total
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    """Заказ: покупатель, позиции, доставка и итоговая сумма"""
     buyer_email = serializers.ReadOnlyField(source='buyer.email')
     items = OrderItemSerializer(many=True, read_only=True)
     delivery_contact_data = ContactSerializer(source='delivery_contact', read_only=True)
-    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -154,3 +141,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'items', 'delivery_contact', 'delivery_contact_data', 'total_amount'
         )
         read_only_fields = ('id', 'buyer', 'buyer_email', 'created_at', 'items', 'total_amount')
+
+    def get_total_amount(self, obj):
+        # Считаем сумму по позициям, чтобы не хранить её в БД
+        return sum(item.line_total for item in obj.items.all())
