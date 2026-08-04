@@ -9,7 +9,7 @@
 | **2** | Проработка моделей данных. | ✅ **Done** |
 | **3** | Реализация импорта товаров.| ✅ **Done** |
 | **4** | Реализация API views. | ✅ **Done** |
-| **5** | Полностью готовый backend. | ⏳ **В работе** |
+| **5** | Полностью готовый backend. | ✅ **Done** |
 
 ## 🖥 Техническое окружение
 * **ОС**: Ubuntu LTS (в среде VirtualBox/WSL2).
@@ -123,7 +123,7 @@ TOKEN=$(curl -s -X POST "http://127.0.0.1:8000/api/v1/token/" \
 -H "Content-Type: application/json" \
 -d '{"email": "test@example.ru", "password": "StrongPassw0rd!"}' | jq -r '.access')
 
-# Создание контакта (адреса) [ID появится в ответе]
+# Создание адреса + подтверждение письмом (в терминале) выбора адреса доставки
 curl -X POST "http://127.0.0.1:8000/api/v1/contacts/" \
 -H "Authorization: Bearer $TOKEN" \
 -H "Content-Type: application/json" \
@@ -135,6 +135,13 @@ curl -X POST "http://127.00.1:8000/api/v1/orders/add-to-basket/" \
 -H "Authorization: Bearer $TOKEN" \
 -H "Content-Type: application/json" \
 -d "{\"offer_id\": $OFFER_ID}"
+
+# Подтверждение корзины
+ORDER_ID=1
+CONTACT_ID=2 #superuser 1
+
+curl -X POST "http://127.0.0.1:8000/api/v1/orders/$ORDER_ID/confirm/" \
+-H "Authorization: Bearer $TOKEN" \ 
 
 # Проверка истории своих заказов
 curl -X GET "http://127.0.0.1:8000/api/v1/orders/" \

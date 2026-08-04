@@ -145,3 +145,14 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_total_amount(self, obj):
         # Считаем сумму по позициям, чтобы не хранить её в БД
         return sum(item.line_total for item in obj.items.all())
+
+    
+    def to_internal_value(self, data):
+        internal_value = super().to_internal_value(data)
+
+        # Сохраняем исходные значения полей перед обновлением
+        instance = getattr(self, 'instance', None)
+        if instance is not None:
+            setattr(instance, '_original_status', instance.status)
+
+        return internal_value
