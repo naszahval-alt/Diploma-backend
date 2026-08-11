@@ -3,15 +3,19 @@ Cериализаторы для API автоматизации закупок.
 Тут превращаем модели Django в JSON для фронтенда.
 Пароль и себестоимость не отдаём в API.
 """
-
-# serializers.py
+import secrets
+from datetime import timedelta
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from .models import (
     User, Shop, Category, Product,
     ProductInfo, Parameter, ProductParameter,
-    Contact, Order, OrderItem
+    Contact, Order, OrderItem, PasswordResetToken
 )
+
 
 class UserSerializer(serializers.ModelSerializer):
     contacts = serializers.StringRelatedField(many=True, read_only=True)
@@ -156,3 +160,67 @@ class OrderSerializer(serializers.ModelSerializer):
             setattr(instance, '_original_status', instance.status)
 
         return internal_value
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError({"email": "Пользователь с таким адресом не найден."})
+        return value
+
+    def save(self):
+        email = self.validated_data['email']
+        user = User.objects.get(email=email)
+        
+        # Очистка старых токенов
+        user.password_reset_tokens.filter(expires_at__lt=timezone.now()).delete()
+        
+        token_str = secrets.token_urlsafe(32)
+        expires = timezone.now() + timedelta(hours=24)
+        
+        PasswordResetToken.objects.create(user=user, token=token_str, expires_at=expires)
+        
+        reset_link = f"{settings.FRONTEND_URL}/reset-password/{token_str}/"
+        
+        subject = 'Сброс пароля'
+        message = (
+            f"Для сброса пароля перейдите по ссылке:\n{reset_link}\n\n"
+            "Ссылка действительна 24 часа."
+        )
+        
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    new_password = serializers.CharField(write_only=True)
+    new_password2 = serializers.CharField(write_only=True)
+    token = serializers.CharField(write_only=True)
+
+    def validate_token(self, value):
+        try:
+            self.token_obj = PasswordResetToken.objects.select_related('user').get(token=value)
+        except PasswordResetToken.DoesNotExist:
+            raise serializers.ValidationError({"token": "Неверный или устаревший токен."})
+        
+        if not self.token_obj.is_valid():
+            raise serializers.ValidationError({"token": "Срок действия токена истек."})
+            
+        return value
+
+    def validate(self, data):
+        if data['new_password'] != data['new_password2']:
+            raise serializers.ValidationError({"new_password": "Пароли не совпадают."})
+        return data
+
+    def save(self):
+        user = self.token_obj.user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        self.token_obj.delete()

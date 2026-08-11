@@ -15,8 +15,6 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from api.views import RegisterUserView 
-
 
 # Вьюсеты нашего приложения 'api'
 from api.views import (
@@ -26,7 +24,8 @@ from api.views import (
     ProductViewSet,
     ProductInfoViewSet,
     ContactViewSet,
-    OrderViewSet,
+    OrderViewSet, RegisterUserView, PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 # Документация (Swagger / ReDoc)
@@ -69,7 +68,11 @@ urlpatterns = [
     path('api/v1/token/refresh/', TokenRefreshView.as_view()),
     
     # Регистрация
-    path('api/v1/register/', RegisterUserView.as_view(), name='register-user'),
+    path('api/v1/register/', RegisterUserView.as_view()),
+
+    # Восстановление пароля
+    path('api/v1/password-reset/', PasswordResetRequestView.as_view()),
+    path('api/v1/password-reset/confirm/', PasswordResetConfirmView.as_view()),
 
     # Документация
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0)),

@@ -79,9 +79,9 @@ python manage.py runserver 0.0.0.0:8000
 Убедись, что файл `shop1.yaml` лежит в корне проекта (рядом с `manage.py`).
 
 1.  Запусти команду загрузки:
-    ```bash
+```bash
     python manage.py import_shop
-    ```
+ ```
 2.  Ожидаемый результат в консоли:
 ```
     > Удалено старых предложений: X
@@ -90,7 +90,7 @@ python manage.py runserver 0.0.0.0:8000
 3.  Проверка API:
     * Открой [http://127.0.0.1:8000/api/v1/offers/](http://127.0.0.1:8000/api/v1/offers/) или документацию Swagger `/docs/`. Должен отобразиться список товаров из файла.
 
----
+
 
 ## ✅ Этап 4: Реализация API views (Базовая часть)
 ### Реализована полная цепочка оформления заказа через REST API с авторизацией по JWT.
@@ -146,4 +146,15 @@ curl -X POST "http://127.0.0.1:8000/api/v1/orders/$ORDER_ID/confirm/" \
 # Проверка истории своих заказов
 curl -X GET "http://127.0.0.1:8000/api/v1/orders/" \
 -H "Authorization: Bearer $TOKEN"
+
+# Восстановление пароля
+curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/" \
+-H "Content-Type: application/json" \
+-d '{"email": "test@example.ru"}'
+
+# Далее копируем ссылку из письма и вводим:
+curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/confirm/" \
+-H "Content-Type: application/json" \
+-d '{"token": "ссылка_из_письма", "new_password": "NewPass123!", "new_password2": "NewPass123!"}'
+
 ```

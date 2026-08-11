@@ -26,7 +26,8 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer, ShopSerializer, CategorySerializer,
     ProductSerializer, ProductInfoSerializer, ParameterSerializer,
     ProductParameterSerializer, ContactSerializer,
-    OrderSerializer, OrderItemSerializer
+    OrderSerializer, OrderItemSerializer, PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer
 )
 
 
@@ -202,3 +203,22 @@ class OrderViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': 'Проверьте почту для сброса пароля.'}, status=status.HTTP_200_OK)
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': 'Пароль успешно изменен.'}, status=status.HTTP_200_OK)
