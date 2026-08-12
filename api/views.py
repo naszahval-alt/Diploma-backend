@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 
 from django.db.models import Sum, F
 from .models import (
@@ -57,7 +58,28 @@ class ShopViewSet(viewsets.ModelViewSet):
     """Список магазинов (доступно без авторизации)"""
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
-    permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        # Список магазинов могут смотреть все, а создание/редактирование требует авторизации
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        """
+        Cоздавать магазин может только User типа 'shop'.
+        """
+        user = self.request.user
+
+        if user.type != 'shop':
+            raise ValidationError(
+                {'detail': 'Создавать магазины могут только пользователи с ролью "Магазин".'}
+            )
+
+        # Если проверка пройдена — привязываем текущего пользователя к магазину
+        serializer.save(owner=user)
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -203,52 +225,79 @@ class OrderViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     @action(detail=True, methods=['patch'], url_path='change-status')
     def change_status(self, request, pk=None):
         """
-        Изменение статуса заказа через API.
-        Доступно владельцу магазина (для своих заказов) или суперпользователю.
+        Изменение статуса заказа поставщиком или покупателем.
+        Поставщик может менять статус только если в заказе есть его товары.
         """
         order = self.get_object()
+        user = request.user
 
-        # Проверка прав доступа:
-        # 1. Суперпользователь всегда может менять статусы.
-        # 2. Поставщик может менять статус только если он владелец магазина, чей товар в заказе.
-        is_supplier_of_order = False
-        for item in order.items.all():
-            if item.offer and item.offer.shop and item.offer.shop.owner == request.user:
-                is_supplier_of_order = True
-                break
+        # Суперпользователь может всё
+        if user.is_superuser or user.is_staff:
+            pass
 
-        if not (request.user.is_superuser or is_supplier_of_order):
-            return Response(
-                {'detail': 'У вас нет прав на изменение этого заказа.'}, 
-                status=status.HTTP_403_FORBIDDEN
+        # Покупатель видит только свои заказы
+        elif user.type == 'buyer':
+            if order.buyer != user:
+                return Response(
+                    {'detail': 'Доступ запрещен. Это чужой заказ.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # Поставщик: проверяем, есть ли его товары в этом заказе
+        elif user.type == 'shop' and hasattr(user, 'managed_shop'):
+            shop = user.managed_shop
+
+            has_items_from_my_shop = any(
+                item.offer.shop_id == shop.id
+                for item in order.items.all()
             )
 
+            if not has_items_from_my_shop:
+                return Response(
+                    {
+                        'error': 'Вы не можете менять статус этого заказа, '
+                                 'так как он не содержит ваших товарных предложений.'
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            return Response({'detail': 'Некорректный тип пользователя.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Логика смены статуса
         new_status = request.data.get('status')
-        
-        # Список всех допустимых статусов из models.py
         valid_statuses = [choice[0] for choice in Order.STATE_CHOICES]
-        
+
         if not new_status or new_status not in valid_statuses:
             return Response(
-                {'error': f'Неверный статус. Допустимые значения: {valid_statuses}'}, 
+                {'error': 'Неверное значение статуса.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Обновляем статус
-        old_status = order.status
+        # Опциональная логика переходов состояний (бизнес-логика)
+        allowed_transitions = {
+            'basket': ['confirmed'],
+            'confirmed': ['packed'],
+            'packed': ['shipped'],
+            'shipped': ['delivered']
+        }
+
+        current = order.status
+        if new_status not in allowed_transitions.get(current, []) and new_status != current:
+            return Response(
+                {'error': f"Нельзя перевести из '{current}' в '{new_status}'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         order.status = new_status
         order.save(update_fields=['status'])
-        
-        return Response({
-            'detail': f'Статус изменен с "{old_status}" на "{new_status}"',
-            'order': OrderSerializer(order).data
-        })
 
-    
+        return Response(OrderSerializer(order).data)
+
+
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
@@ -257,6 +306,7 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({'detail': 'Проверьте почту для сброса пароля.'}, status=status.HTTP_200_OK)
+
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]

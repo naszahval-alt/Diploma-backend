@@ -147,6 +147,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/orders/$ORDER_ID/confirm/" \
 curl -X GET "http://127.0.0.1:8000/api/v1/orders/" \
 -H "Authorization: Bearer $TOKEN"
 
+
 # Восстановление пароля
 curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/" \
 -H "Content-Type: application/json" \
@@ -156,5 +157,13 @@ curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/" \
 curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/confirm/" \
 -H "Content-Type: application/json" \
 -d '{"token": "ссылка_из_письма", "new_password": "NewPass123!", "new_password2": "NewPass123!"}'
+
+
+# Создание магазина под Пользователем "Магазин"
+curl -X POST "http://127.0.0.1:8000/api/v1/shops/" \
+-H "Authorization: Bearer <ТОКЕН USER SHOP>" \
+-H "Content-Type: application/json" \
+-d '{"title": "Мой ларек"}'
+
 
 ```

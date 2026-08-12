@@ -98,7 +98,7 @@ def send_order_confirmation(sender, instance, created, **kwargs):
         return
 
     subject = f"[ВАЖНО] Заказ №{instance.id} собран поставщиком"
-    body = f"Заказ №{instance.id} переведён в статус 'packed'.\n\nСписок товаров:\n{chr(10).join([f'- {i[0]} x{i[1]}' for i in items_list])}"
+    body = f"Заказ №{instance.id} переведён в статус 'Собран'.\n\nСписок товаров:\n{chr(10).join([f'- {i[0]} x{i[1]}' for i in items_list])}"
 
     try:
         email = EmailMessage(
