@@ -9,6 +9,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 STATE_CHOICES = (
     ('basket', 'Корзина'),
@@ -270,12 +272,33 @@ class Order(models.Model):
 
     @property
     def total_amount(self):
-        """Считаем общую сумму заказа по его позициям"""
         items_sum = sum(item.line_total for item in self.items.all())
         return items_sum
 
     def __str__(self):
         return f"№{self.id} от {self.created_at.strftime('%d.%m.%Y')} - {self.get_status_display()}"
+
+    def save(self, *args, **kwargs):
+        """
+        Переопределяем save, чтобы сохранять старый статус перед записью в БД.
+        """
+        if self.pk is not None:  # Если объект уже существует (не новый)
+            try:
+                old_obj = Order.objects.get(pk=self.pk)
+                setattr(self, '_original_status', old_obj.status)
+            except Order.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+
+@receiver(pre_save, sender=Order)
+def set_original_status_on_create(sender, instance, **kwargs):
+    """
+    Устанавливаем начальное значение _original_status при самом первом создании.
+    """
+    if not instance.pk and not hasattr(instance, '_original_status'):
+        setattr(instance, '_original_status', instance.status)
 
 
 class OrderItem(models.Model):
@@ -307,7 +330,6 @@ class OrderItem(models.Model):
         return f"{self.amount} x {self.offer.product.name}"
 
 
-# New 
 class PasswordResetToken(models.Model):
     """Токен для сброса пароля"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')

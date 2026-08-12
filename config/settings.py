@@ -83,9 +83,19 @@ LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
 USE_TZ = True
+
+# Читаем почту администратора из .env
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
+if not ADMIN_EMAIL:
+    raise ValueError("В .env не задана переменная ADMIN_EMAIL")
+
+ADMINS = [("Admin", ADMIN_EMAIL)]
+
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'no-reply@diploma.local'
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
@@ -120,8 +130,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'no-reply@diploma.local'
 
 # Swagger (drf-yasg)
 SWAGGER_SETTINGS = {

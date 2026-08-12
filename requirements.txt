@@ -8,3 +8,4 @@ drf-yasg>=1.21
 django-cors-headers>=4.2
 django-extensions>=3.2
 python-dotenv
+reportlab

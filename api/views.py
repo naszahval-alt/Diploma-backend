@@ -203,6 +203,50 @@ class OrderViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+    @action(detail=True, methods=['patch'], url_path='change-status')
+    def change_status(self, request, pk=None):
+        """
+        Изменение статуса заказа через API.
+        Доступно владельцу магазина (для своих заказов) или суперпользователю.
+        """
+        order = self.get_object()
+
+        # Проверка прав доступа:
+        # 1. Суперпользователь всегда может менять статусы.
+        # 2. Поставщик может менять статус только если он владелец магазина, чей товар в заказе.
+        is_supplier_of_order = False
+        for item in order.items.all():
+            if item.offer and item.offer.shop and item.offer.shop.owner == request.user:
+                is_supplier_of_order = True
+                break
+
+        if not (request.user.is_superuser or is_supplier_of_order):
+            return Response(
+                {'detail': 'У вас нет прав на изменение этого заказа.'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        new_status = request.data.get('status')
+        
+        # Список всех допустимых статусов из models.py
+        valid_statuses = [choice[0] for choice in Order.STATE_CHOICES]
+        
+        if not new_status or new_status not in valid_statuses:
+            return Response(
+                {'error': f'Неверный статус. Допустимые значения: {valid_statuses}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Обновляем статус
+        old_status = order.status
+        order.status = new_status
+        order.save(update_fields=['status'])
+        
+        return Response({
+            'detail': f'Статус изменен с "{old_status}" на "{new_status}"',
+            'order': OrderSerializer(order).data
+        })
 
     
 class PasswordResetRequestView(APIView):

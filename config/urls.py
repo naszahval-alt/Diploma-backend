@@ -74,6 +74,9 @@ urlpatterns = [
     path('api/v1/password-reset/', PasswordResetRequestView.as_view()),
     path('api/v1/password-reset/confirm/', PasswordResetConfirmView.as_view()),
 
+    # Кастомный endpoint для смены статуса заказа
+    path('api/v1/orders/<int:pk>/change-status/', OrderViewSet.as_view({'patch': 'change_status'})),
+
     # Документация
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0)),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0)),
