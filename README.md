@@ -129,41 +129,51 @@ curl -X POST "http://127.0.0.1:8000/api/v1/contacts/" \
 -H "Content-Type: application/json" \
 -d '{"city": "Москва", "street": "Ленина", "house": "1", "phone_number": "+79991112233", "contact_type": "address"}'
 
-# Добавляем товар в корзину (offer_id можно взять из /offers/)
+# Восстановление пароля
+curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/" \
+-H "Content-Type: application/json" \
+-d '{"email": "test@example.ru"}'
+# Далее копируем часть ссылки (последнюю часть) из письма и вводим:
+curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/confirm/" \
+-H "Content-Type: application/json" \
+-d '{"token": "часть_ссылки_из_письма", "new_password": "NewPass123!", "new_password2": "NewPass123!"}'
+
+# Создаём заказ со статусом basket
+TOKEN=$(curl -s -X POST "http://127.0.0.1:8000/api/v1/token/" \
+-H "Content-Type: application/json" \
+-d '{"email": "test@example.ru", "password": "NewPass123!"}' | jq -r '.access')
+
+# Добавляем товары от разных магазинов в этот заказ
 OFFER_ID=43 # Пример ID iPhone XS Max от МТС
-curl -X POST "http://127.00.1:8000/api/v1/orders/add-to-basket/" \
+curl -X POST "http://127.0.0.1:8000/api/v1/orders/add-to-basket/" \
 -H "Authorization: Bearer $TOKEN" \
 -H "Content-Type: application/json" \
 -d "{\"offer_id\": $OFFER_ID}"
 
-# Подтверждение корзины
+OFFER_ID=64 # Пример USB Flash Drive Kingston DataTraveler 32GB (red) от DNS
+curl -X POST "http://127.0.0.1:8000/api/v1/orders/add-to-basket/" \
+-H "Authorization: Bearer $TOKEN" \
+-H "Content-Type: application/json" \
+-d "{\"offer_id\": $OFFER_ID}"
+
+# Подтверждение корзины (если товары от разных магазинов, то корзина после подтверждения разобьется на корзины по магазинам, чтобы магазины могли перевести заказ со своим товаром, в статус "Собран")
 ORDER_ID=1
 CONTACT_ID=2 #superuser 1
 
 curl -X POST "http://127.0.0.1:8000/api/v1/orders/$ORDER_ID/confirm/" \
 -H "Authorization: Bearer $TOKEN" \ 
 
-# Проверка истории своих заказов
+# От имени магазина меняем статус на "Собран", если в заказе есть товары из данного магазина
+curl -X PATCH "http://127.0.0.1:8000/api/v1/orders/<id_корзины>/change-status/" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"status": "packed"}' | python3 -m json.tool
+
+# Проверка истории своих заказов (покупатель - видит свои заказы, поставщик видит заказы, где есть его товары)
 curl -X GET "http://127.0.0.1:8000/api/v1/orders/" \
--H "Authorization: Bearer $TOKEN"
+  -H "Authorization: Bearer $TOKEN" \
+  | python3 -m json.tool
 
-
-# Восстановление пароля
-curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/" \
--H "Content-Type: application/json" \
--d '{"email": "test@example.ru"}'
-
-# Далее копируем ссылку из письма и вводим:
-curl -X POST "http://127.0.0.1:8000/api/v1/password-reset/confirm/" \
--H "Content-Type: application/json" \
--d '{"token": "ссылка_из_письма", "new_password": "NewPass123!", "new_password2": "NewPass123!"}'
-
-
-# Создание магазина под Пользователем "Магазин"
+# Создание магазина под Пользователем "Магазин" (пользователь может владеть только одним магазином)
 curl -X POST "http://127.0.0.1:8000/api/v1/shops/" \
 -H "Authorization: Bearer <ТОКЕН USER SHOP>" \
 -H "Content-Type: application/json" \
 -d '{"title": "Мой ларек"}'
-
-
 ```

@@ -6,13 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0001_initial'),
+        ("api", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='order',
-            name='status',
-            field=models.CharField(choices=[('basket', 'Корзина'), ('new', 'Новый'), ('confirmed', 'Подтвержден'), ('packed', 'Собран'), ('shipped', 'В пути'), ('delivered', 'Доставлен'), ('canceled', 'Отменен')], default='basket', max_length=15, verbose_name='Статус'),
+            model_name="order",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("basket", "Корзина"),
+                    ("new", "Новый"),
+                    ("confirmed", "Подтвержден"),
+                    ("packed", "Собран"),
+                    ("shipped", "В пути"),
+                    ("delivered", "Доставлен"),
+                    ("canceled", "Отменен"),
+                ],
+                default="basket",
+                max_length=15,
+                verbose_name="Статус",
+            ),
         ),
     ]

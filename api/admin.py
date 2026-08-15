@@ -2,33 +2,45 @@
 Административная панель Django Admin.
 Настройка отображения моделей проекта в интерфейсе администратора.
 """
+from typing import ClassVar
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+
 from .models import (
-    User, Shop, Category, Product,
-    ProductInfo, Parameter, ProductParameter,
-    Order, OrderItem, Contact
+    Category,
+    Contact,
+    Order,
+    OrderItem,
+    Parameter,
+    Product,
+    ProductInfo,
+    ProductParameter,
+    Shop,
+    User,
 )
 
 
 # --- ИНЛАЙНЫ (ВЛОЖЕННЫЕ ТАБЛИЦЫ) ---
 class ProductParameterInline(admin.TabularInline):
     """Редактирование характеристик товара прямо внутри карточки предложения"""
+
     model = ProductParameter
     extra = 1
 
 
 class OrderItemInline(admin.TabularInline):
     """Состав заказа: товары и их количество"""
+
     model = OrderItem
     extra = 0
-    readonly_fields = ('line_total',)
-    autocomplete_fields = ['offer']
+    readonly_fields = ("line_total",)
+    autocomplete_fields: ClassVar[list] = ["offer"]
 
 
 class ContactInline(admin.TabularInline):
     """Адреса доставки и телефоны покупателя"""
+
     model = Contact
     extra = 1
     verbose_name = "Контакт"
@@ -37,34 +49,36 @@ class ContactInline(admin.TabularInline):
 
 class OrderInline(admin.TabularInline):
     """Список товаров внутри конкретного заказа"""
+
     model = Order
     extra = 0
 
     def has_add_permission(self, request, obj=None):
         return False
 
-
     # --- РЕГИСТРАЦИЯ МОДЕЛЕЙ ---
+
+
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('title', 'owner_email', 'accepts_orders')
-    search_fields = ('title', 'owner__email')
-    list_filter = ('accepts_orders',)
+    list_display = ("title", "owner_email", "accepts_orders")
+    search_fields = ("title", "owner__email")
+    list_filter = ("accepts_orders",)
 
-    @admin.display(description='Email владельца')
+    @admin.display(description="Email владельца")
     def owner_email(self, obj):
-        return obj.owner.email if obj.owner else '-'
+        return obj.owner.email if obj.owner else "-"
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('title',)
-    filter_horizontal = ('stores',)
+    list_display = ("title",)
+    filter_horizontal = ("stores",)
 
     class Meta:
-        verbose_name = 'Категория'
+        verbose_name = "Категория"
         verbose_name_plural = "Категории товаров"
-        ordering = ('title',)
+        ordering = ("title",)
 
     def __str__(self):
         return self.title
@@ -72,14 +86,14 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category')
-    search_fields = ('name',)
-    list_filter = ('category',)
+    list_display = ("name", "category")
+    search_fields = ("name",)
+    list_filter = ("category",)
 
     class Meta:
-        verbose_name = 'Товарная позиция'
+        verbose_name = "Товарная позиция"
         verbose_name_plural = "Справочник товаров"
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return self.name
@@ -91,39 +105,40 @@ class ProductInfoAdmin(admin.ModelAdmin):
     Предложение товара от конкретного магазина.
     Здесь хранятся цена закупки/продажи и остатки.
     """
-    list_display = ('product_title', 'shop_title', 'retail_price', 'available_count')
-    list_filter = ('shop',)
-    search_fields = ('product__name', 'shop__title', 'article')
-    inlines = [ProductParameterInline]
 
-    @admin.display(description='Товар')
+    list_display = ("product_title", "shop_title", "retail_price", "available_count")
+    list_filter = ("shop",)
+    search_fields = ("product__name", "shop__title", "article")
+    inlines: ClassVar[list] = [ProductParameterInline]
+
+    @admin.display(description="Товар")
     def product_title(self, obj):
         return obj.product.name
 
-    @admin.display(description='Магазин')
+    @admin.display(description="Магазин")
     def shop_title(self, obj):
         return obj.shop.title
 
 
 @admin.register(Parameter)
 class ParameterAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ("name",)
+    search_fields = ("name",)
 
     class Meta:
-        verbose_name = 'Параметр'
+        verbose_name = "Параметр"
         verbose_name_plural = "Список параметров"
 
 
 class ContactAdmin(admin.ModelAdmin):
-    search_fields = ('user__email', 'city', 'street')
-    list_filter = ('contact_type', 'city')
+    search_fields = ("user__email", "city", "street")
+    list_filter = ("contact_type", "city")
 
     def user_email(self, obj):
         return obj.user.email
 
     class Meta:
-        verbose_name = 'Контактные данные'
+        verbose_name = "Контактные данные"
         verbose_name_plural = "Адреса и телефоны"
 
 
@@ -133,43 +148,56 @@ class OrderAdmin(admin.ModelAdmin):
     Управление заказами покупателей.
     Сумма считается динамически, редактировать её нельзя.
     """
-    list_display = ('id', 'buyer_email', 'status', 'created_at', 'total_amount')
-    list_filter = ('status', 'created_at')
-    search_fields = ('buyer__email', 'id')
-    inlines = [OrderItemInline]
-    readonly_fields = ('total_amount', 'created_at')
 
-    @admin.display(description='Покупатель')
+    list_display = ("id", "buyer_email", "status", "created_at", "total_amount")
+    list_filter = ("status", "created_at")
+    search_fields = ("buyer__email", "id")
+    inlines: ClassVar[list] = [OrderItemInline]
+    readonly_fields = ("total_amount", "created_at")
+
+    @admin.display(description="Покупатель")
     def buyer_email(self, obj):
         return obj.buyer.email
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('buyer')
+        return qs.select_related("buyer")
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Админка для управления покупателями и магазинами"""
 
-    list_display = ('email', 'type', 'is_staff', 'is_active')
-    search_fields = ('email',)
-    ordering = ('email',)
+    list_display = ("email", "type", "is_staff", "is_active")
+    search_fields = ("email",)
+    ordering = ("email",)
 
     fieldsets = (
-        (None, {'fields': ('email', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'type')}),
-        ('Permissions', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
-        }),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+        (None, {"fields": ("email", "password")}),
+        ("Personal info", {"fields": ("first_name", "last_name", "type")}),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
 
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('email', 'password1', 'password2', 'type'),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "password1", "password2", "type"),
+            },
+        ),
     )
 
-    inlines = [ContactInline, OrderInline] 
+    inlines: ClassVar[list] = [ContactInline, OrderInline]
